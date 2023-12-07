@@ -1,4 +1,4 @@
-# CSYE6225-Cloud Computing Project
+# Cloud Computing Web Project
 
 ## Overview
 
