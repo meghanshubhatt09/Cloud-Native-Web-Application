@@ -1,0 +1,317 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CSYE 6225 Auto Scaling
+
+Parameters:
+  AMIID:
+    Description: "Select AMI ID"
+    Type: String
+    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+
+  KeyName:
+    Description: "Name of an existing EC2 KeyPair to enable SSH access to the instance"
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: must be the name of an existing EC2 KeyPair
+
+  HostedZoneResource:
+    Description: "DNS HOST NAME"
+    Type: String
+    Default: prod.meghanshubhatt.me.
+
+  RDSDBinstance:
+    Type: String
+    Default: ""
+  
+  RecordServiceS3Bucket:
+    Type: String
+    Default: ""
+
+  SSLCertificateId:
+    Type: String
+    Default: "6f053459-ca86-4588-9482-11309613ddc9"
+    Description: "SSL Certificate Id"
+
+
+
+
+Resources:
+  asgLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    DependsOn:
+      - EBSKmsKey
+    Properties:
+      LaunchTemplateName: !Sub '${AWS::StackName}-launch-template'
+      LaunchTemplateData:
+        BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 20
+            VolumeType: "gp2"
+            DeleteOnTermination: true
+            Encrypted: "true"
+            KmsKeyId: !Ref EBSKmsKey
+        ImageId: !Ref AMIID
+        InstanceType: t2.micro
+        KeyName: !Ref KeyName
+        IamInstanceProfile: 
+          Name: 
+            Fn::ImportValue:
+              !Sub RootInstanceProfile
+        NetworkInterfaces:
+          - DeviceIndex: 0
+            AssociatePublicIpAddress: "true"
+            Groups:
+              - Fn::ImportValue:
+                  !Sub "InstanceSecurityGroup"
+        UserData:
+          Fn::Base64: !Sub
+            - |
+              #!/bin/bash
+              sudo touch /home/ubuntu/application.properties
+              sudo chmod 764 /home/ubuntu/application.properties
+              sudo echo spring.jackson.serialization.fail-on-empty-beans=false >> /home/ubuntu/application.properties
+              sudo echo server.port=8080 >> /home/ubuntu/application.properties
+              sudo echo cloud.aws.region.static=${AWS::Region} >> /home/ubuntu/application.properties
+              sudo echo cloud.aws.stack.auto=false >> /home/ubuntu/application.properties
+              sudo echo cloud.aws.profile=${RootInstanceProfile} >> /home/ubuntu/application.properties
+              sudo echo spring.session.jdbc.initialize-schema=always  >> /home/ubuntu/application.properties
+              sudo echo app.awsServices.bucketName=${RecordServiceS3Bucket} >> /home/ubuntu/application.properties
+              sudo echo spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver >> /home/ubuntu/application.properties
+              sudo echo spring.datasource.url=jdbc:mysql:\/\/${RDSDBEndpointAddress}:3306\/csye6225  >> /home/ubuntu/application.properties
+              sudo echo spring.datasource.username=csye6225DB >> /home/ubuntu/application.properties
+              sudo echo spring.datasource.password=csye6225DB >> /home/ubuntu/application.properties
+              sudo echo spring.jpa.database=MYSQL >> /home/ubuntu/application.properties
+              sudo echo spring.jpa.hibernate.ddl-auto=update >> /home/ubuntu/application.properties
+              sudo echo spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQLDialect >> /home/ubuntu/application.properties
+              sudo echo logging.file.name=csye6225.log >> /home/ubuntu/application.properties
+              sudo echo logging.file.path=/home/ubuntu >> /home/ubuntu/application.properties
+              sudo echo logging.level.com.cloud.rest.webservices.webapp.*=INFO >> /home/ubuntu/application.properties
+              sudo echo publish.metrics=true >> /home/ubuntu/application.properties
+              sudo echo metrics.server.hostname=localhost >> /home/ubuntu/application.properties
+              sudo echo metrics.server.port=8125 >> /home/ubuntu/application.properties
+              sudo iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-ports 8080
+              sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+              -a fetch-config \
+              -m ec2 \
+              -c file:/home/ubuntu/cloudwatch-config.json \
+              -s
+              java -jar /home/ubuntu/webapp-0.0.1-SNAPSHOT.jar --spring.config.location=file:////home/ubuntu/application.properties &
+            - RootInstanceProfile: !ImportValue RootInstanceProfile
+              RecordServiceS3Bucket: !ImportValue RecordServiceS3Bucket
+              RDSDBEndpointAddress: !ImportValue RDSDBEndpointAddress
+              
+
+  # RootInstanceProfile:
+  #   Type: AWS::IAM::InstanceProfile
+  #   Properties:
+  #     InstanceProfileName: instance-ec2-profile
+  #     Path: /
+  #     Roles:
+  #       - Fn::ImportValue:
+  #           !Sub "EC2CSYE6225Role"
+
+  ### S3 BUCKET CREATION
+
+  EBSKmsKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: !Sub KMS Key for EBS
+      KeyPolicy:
+        Version: "2012-10-17"
+        Id: "kms-key-for-ebs"      
+        Statement:
+          - Sid: "Allow IAM User permission for EBS"
+            Effect: Allow
+            Principal:
+              AWS: !Join 
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref 'AWS::AccountId'
+                  - ':root'
+            Action:
+              - "kms:*"
+            Resource: "*"
+          - Sid: "Add service role"
+            Effect: Allow
+            Principal:
+              AWS: !Join 
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref 'AWS::AccountId'
+                  - ':role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling'
+            Action:
+              - "kms:*"
+            Resource: "*"  
+
+  
+  asgWebApp:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Sub ${AWS::StackName}-asg
+      AvailabilityZones:
+        - Fn::ImportValue:
+            !Sub "SubnetRegion1"
+        - Fn::ImportValue:
+            !Sub "SubnetRegion2"
+        - Fn::ImportValue:
+            !Sub "SubnetRegion3"
+
+      Cooldown: '60'
+      DesiredCapacity: '1'
+      HealthCheckGracePeriod: 250
+      HealthCheckType: EC2
+      LaunchTemplate:
+        LaunchTemplateId: !Ref asgLaunchTemplate
+        Version: !GetAtt asgLaunchTemplate.LatestVersionNumber
+      # LoadBalancerNames:
+      #   - String
+      MaxSize: '3'
+      MinSize: '1'
+      # NewInstancesProtectedFromScaleIn: true
+      Tags:
+        - Key: Application
+          Value: WebApp
+          PropagateAtLaunch: "true"
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-asg
+          PropagateAtLaunch: "true"
+      TargetGroupARNs:
+        - !Ref loadBalancerTargetGroup
+      VPCZoneIdentifier:
+        - Fn::ImportValue:
+            !Sub "mySubnet1"
+        - Fn::ImportValue:
+            !Sub "mySubnet2"
+        - Fn::ImportValue:
+            !Sub "mySubnet3"
+
+  # Create Auto Scaling Policy for Scaling Out
+  EC2AutoScalingPolicyForScalingOut:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      ScalingAdjustment: '1'
+      AutoScalingGroupName: !Ref asgWebApp
+  
+  AvgCPUUp:
+    Type: AWS::CloudWatch::Alarm
+    Properties: 
+      AlarmDescription: !Sub '${AWS::StackName}-AVGCPUUP'
+      ComparisonOperator: GreaterThanThreshold
+      EvaluationPeriods: 2
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Period: 60
+      Statistic: Average
+      Threshold: 5.0
+      AlarmActions:
+        - !Ref EC2AutoScalingPolicyForScalingOut
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref asgWebApp
+
+  EC2AutoScalingPolicyForScalingIn:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      ScalingAdjustment: '-1'
+      AutoScalingGroupName: !Ref asgWebApp
+
+  AvgCPUDown:
+    Type: AWS::CloudWatch::Alarm
+    Properties: 
+      AlarmDescription: !Sub '${AWS::StackName}-AVGCPUDOWN'
+      ComparisonOperator: LessThanThreshold
+      EvaluationPeriods: 2
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Period: 60
+      Statistic: Average
+      Threshold: 3.0
+      AlarmActions:
+        - !Ref EC2AutoScalingPolicyForScalingIn
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref asgWebApp
+
+  loadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: ipv4
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: '60'
+      Name: !Sub ${AWS::StackName}-load-balancer
+      Scheme: internet-facing
+      SecurityGroups:
+        - Fn::ImportValue:
+            !Sub "LoadBalancerSecurityGroup"
+      Subnets:
+        - Fn::ImportValue:
+            !Sub "mySubnet1"
+        - Fn::ImportValue:
+            !Sub "mySubnet2"
+        - Fn::ImportValue:
+            !Sub "mySubnet3"
+      Tags:
+        - Key: Application
+          Value: WebApp
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-load-balancer
+      Type: application
+
+  loadBalancerTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 90
+      HealthCheckPath: '/healthz'
+      HealthCheckPort: '8080'
+      HealthCheckProtocol: 'HTTP'
+      HealthCheckTimeoutSeconds: 60
+      HealthyThresholdCount: 2
+      IpAddressType: ipv4
+      Name: !Sub ${AWS::StackName}-lb-tg
+      Port: 8080
+      Protocol: 'HTTP'
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-lb-tg
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '20'
+      TargetType: instance
+      UnhealthyThresholdCount: 2
+      VpcId: 
+        Fn::ImportValue: 
+          !Sub VpcId
+
+  loadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref loadBalancerTargetGroup
+      LoadBalancerArn: !Ref loadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !Join [ "", [ "arn:aws:acm:", !Ref AWS::Region, ":", !Ref AWS::AccountId, ":certificate/", !Ref SSLCertificateId ] ]
+
+
+  myDNSRecord:
+      Type: AWS::Route53::RecordSet
+      DependsOn:
+        - loadBalancer
+      Properties:
+        HostedZoneName: !Ref HostedZoneResource
+        Comment: DNS name for my instance
+        Name: !Ref HostedZoneResource
+        Type: A
+        AliasTarget:
+          DNSName: !GetAtt loadBalancer.DNSName
+          HostedZoneId: !GetAtt loadBalancer.CanonicalHostedZoneID
+
+
+
+
+
+

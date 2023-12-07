@@ -1,0 +1,9 @@
+version: 0.0
+Resources:
+  - myLambda:
+      Type: AWS::Lambda::Function
+      Properties:
+        Name: "myLambda"
+        Alias: "myLambda"
+        CurrentVersion: "1"
+        TargetVersion: "2"

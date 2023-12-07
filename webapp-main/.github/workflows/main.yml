@@ -1,0 +1,53 @@
+name: Workflow Unit Testing
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build_and_test_java:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: 17
+        distribution: 'adopt'
+        cache: maven
+
+    - name: Setting up Docker
+      uses: docker-practice/actions-setup-docker@master
+  
+    - name: Database Initialization
+      run: |
+        docker run --detach \--env MYSQL_ROOT_PASSWORD=user \--env MYSQL_USER=user \--env MYSQL_PASSWORD=user \--env MYSQL_DATABASE=mydatabase \--name mysql \--publish 3306:3306 mysql:8-oracle
+
+    - name: Build project with Maven
+      run: mvn clean install
+
+    # - name: Configure AWS Credentials
+    #   uses: aws-actions/configure-aws-credentials@v1
+    #   with:
+    #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+    #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    #     # aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }} 
+    #     # if you have/need it
+    #     aws-region: us-east-1
+    # # Initialize Packer templates
+    # # - name: Packer Init
+    # #   working-directory: ./AMI
+    # #   run: packer init .
+    # Validate Template
+    - name: Validate Template
+      working-directory: ./AMI
+      run: packer validate ami.pkr.hcl
+    # # build artifact
+    # - name: Build Artifact
+    #   working-directory: ./AMI
+    #   run: packer build --var-file=ami.pkrvars.hcl ami.pkr.hcl
+    #   env:
+    #     PACKER_LOG: 1

@@ -1,0 +1,184 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: VPC-Lambda Function - To send user email for verification
+
+Parameters:
+
+  S3BucketName:
+    Description: "Name of the S3 Bucket Name"
+    Type: "String"
+    Default: "s3bucket-meghanshubhatt"
+
+  domainName: 
+    Description: "domain Name for S3 Bucket Naming"
+    Type: "String"
+    AllowedValues: ["prod.meghanshubhatt.me"]
+    Default: "prod.meghanshubhatt.me"
+        
+  fromemail:
+    Description: "From address  for SES"
+    Type: "String"
+    Default: "meghanshu@prod.meghanshubhatt.me"
+
+Resources:
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: ''
+          Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Path: "/"
+      RoleName: LambdaExecutionRole
+        
+  myLambda:
+    Type: AWS::Lambda::Function
+    DependsOn:
+    - LambdaExecutionRole
+    Properties:
+      FunctionName: myLambda
+      Handler: EmailEvent::handleRequest
+      Role:
+        Fn::GetAtt:
+        - LambdaExecutionRole
+        - Arn
+      Code:
+        S3Bucket:
+          Ref: S3BucketName
+        S3Key: aws-lambda-0.0.1.zip
+      Description: lambda function for verify user
+      Environment:
+        Variables:
+          domain:
+            Ref: domainName
+          fromemail:
+            Ref: fromemail
+          ttl: '2'
+      Runtime: java8
+      Timeout: 300
+      MemorySize: 512
+  
+
+  mySNSTopic:
+    Type : AWS::SNS::Topic
+    DependsOn : 
+      - myLambda
+    Properties : 
+      TopicName : "email"
+      Subscription: 
+        - Endpoint: !GetAtt myLambda.Arn
+          Protocol: "lambda"
+      DisplayName: "email"
+
+  snsIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: snsIAMRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ssm.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: snsAccess
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Action:
+            - SNS:Publish
+            - SNS:DeleteTopic
+            - SNS:ListSubscriptionsByTopic
+            - SNS:GetTopicAttributes
+            - SNS:Receive
+            - SNS:AddPermission
+            - SNS:Subscribe
+            Effect: Allow
+            Resource:
+            - Ref: mySNSTopic
+
+  LambdaInvokePermission: 
+    Type: "AWS::Lambda::Permission"
+    Properties: 
+      Action: "lambda:InvokeFunction"
+      Principal: "sns.amazonaws.com"
+      SourceArn: !Ref mySNSTopic
+      FunctionName: !GetAtt myLambda.Arn
+
+
+
+  LambdaFunctionPolicy:
+    DependsOn: 
+      - LambdaExecutionRole
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement: 
+          - Effect: Allow
+            Action: 
+              - 'dynamodb:BatchGetItem'
+              - 'dynamodb:GetItem'
+              - 'dynamodb:Query'
+              - 'dynamodb:BatchWriteItem'
+              - 'dynamodb:PutItem'
+              - 'dynamodb:UpdateItem'
+            Resource: !Join [ "", [ "arn:aws:dynamodb:", !Ref AWS::Region , ":", !Ref AWS::AccountId, ":table/csye6225" ] ]
+
+          - Effect: Allow
+            Action:
+              - 'SES:SendEmail'
+              - 'SES:SendRawEmail'
+            Resource: !Join [ "", [ "arn:aws:ses:", !Ref AWS::Region, ":", !Ref AWS::AccountId, ":identity/", !Ref domainName ] ]
+              
+      PolicyName: "LambdaFunctionPolicy"
+      Roles: 
+        - !Ref LambdaExecutionRole 
+
+
+  Ec2SNSTopicPolicy:
+      Type: AWS::IAM::ManagedPolicy
+      DependsOn: mySNSTopic
+      Properties:
+        ManagedPolicyName: Ec2SNSTopicPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Sid: AllowEC2ToPublishToSNSTopic
+            Effect: Allow
+            Action:
+            - SNS:Publish
+            - SNS:Subscribe
+            - sns:CreateTopic
+            Resource:
+              Ref: mySNSTopic
+        Roles:
+        - Fn::ImportValue:
+            Fn::Sub: "EC2CSYE6225Role"
+Outputs:
+  mySNSTopic:
+    Description: "SNS Topic Exporting to Infra Stack"
+    Value: !Ref mySNSTopic
+    Export: 
+      Name: mySNSTopic
+  
+
+            
+
+
+
+
+
+    
+

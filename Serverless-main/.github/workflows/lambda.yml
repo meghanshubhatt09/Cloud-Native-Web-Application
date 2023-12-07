@@ -1,0 +1,40 @@
+name: Lambda Function Workflow
+
+on: 
+  push:
+    branches: [ main ]
+jobs:
+  build_and_test_email_java:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: 17
+        distribution: 'adopt'
+        cache: maven
+    - name: Build project with Maven
+      working-directory: ./csye-6225-aws-lambda/
+      run: mvn clean install
+    - name: Install packages
+      run: |
+        sudo apt update
+        sudo pip install awscli
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+    - name: Upload Artifact to S3 
+      working-directory: ./csye-6225-aws-lambda/target/
+      run: aws s3 cp aws-lambda-0.0.1.zip s3://s3bucket-meghanshubhatt
+    - name: Lambda Stack Coming Up
+      working-directory: ./lambdaStack/
+      run: aws --region us-east-1 cloudformation create-stack --stack-name lambdaStack --template-body file://csye6226-lambda.yml --capabilities CAPABILITY_NAMED_IAM
+
+

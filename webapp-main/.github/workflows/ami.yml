@@ -1,0 +1,88 @@
+name: AMI Creation
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build_and_test_java:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: 17
+        distribution: 'adopt'
+        cache: maven
+    - name: Install packages
+      run: |
+        sudo apt update
+        sudo pip install awscli
+    - name: Setting up Docker
+      uses: docker-practice/actions-setup-docker@master
+  
+    - name: Database Initialization
+      run: |
+        docker run --detach \--env MYSQL_ROOT_PASSWORD=user \--env MYSQL_USER=user \--env MYSQL_PASSWORD=user \--env MYSQL_DATABASE=mydatabase \--name mysql \--publish 3306:3306 mysql:8-oracle
+
+    - name: Build project with Maven
+      run: mvn clean install
+
+    - name: Configure AWS Credentials DEV
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        # aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }} 
+        # if you have/need it
+        aws-region: us-east-1
+    # Initialize Packer templates
+    # - name: Packer Init
+    #   working-directory: ./AMI
+    #   run: packer init .
+    # Validate Template
+    - name: Validate Template
+      working-directory: ./AMI
+      run: packer validate ami.pkr.hcl
+    # build artifact
+    - name: Build Artifact
+      working-directory: ./AMI
+      run: packer build --var-file=ami.pkrvars.hcl ami.pkr.hcl
+      env:
+        PACKER_LOG: 1
+  
+    - name: Configure AWS Credentials PROD
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+        # aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }} 
+        # if you have/need it
+        aws-region: us-east-1
+
+
+    - name: Getting Latest AMI and Launch ID for Autoscaling Template using Name
+      working-directory: ./AMI
+      run: |
+        AMI_ID=$(jq -r '.builds[-1].artifact_id' manifestGetAMI.json | cut -d ":" -f2)
+        echo $AMI_ID
+        LTID=$(aws ec2 describe-launch-templates --launch-template-name loadbalancing-launch-template | jq '.LaunchTemplates[].LaunchTemplateId')
+        LTID="${LTID%\"}"
+        LTID="${LTID#\"}"
+        echo $LTID
+        aws ec2 create-launch-template-version --launch-template-id $LTID --version-description WebVersion2 --source-version 1 --launch-template-data "ImageId=$AMI_ID"
+        aws autoscaling update-auto-scaling-group --auto-scaling-group-name loadbalancing-asg --launch-template LaunchTemplateId=$LTID,Version='$Latest'
+
+      env:
+        PACKER_LOG: 1
+
+    - name: Refreshing Instances
+      run: aws autoscaling start-instance-refresh --auto-scaling-group-name loadbalancing-asg
+
+
+
+    

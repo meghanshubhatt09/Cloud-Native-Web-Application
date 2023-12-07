@@ -1,0 +1,674 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: VPCTemplate
+
+Parameters:
+  UserData:
+    Type: String
+    Default: ""
+
+  VpcCidrBlock:
+    Description: "CIDR block for VPC"
+    Type: String
+    Default: "10.0.0.0/16"
+
+  SubnetRegion1:
+    Description: "Subnet Region 1"
+    Type: String
+    Default: "us-east-1a" 
+
+  CidrBlock1:
+    Description: "Cidr Block 1"
+    Type: String
+    Default: "10.0.1.0/24"
+
+  SubnetRegion2:
+    Description: "Subnet Region 2"
+    Type: String
+    Default: "us-east-1b" 
+
+  CidrBlock2:
+    Description: "Cidr Block 3"
+    Type: String
+    Default: "10.0.2.0/24"
+
+  SubnetRegion3:
+    Description: "Subnet Region 3"
+    Type: String
+    Default: "us-east-1c" 
+    
+  CidrBlock3:
+    Description: "Cidr Block 3"
+    Type: String
+    Default: "10.0.3.0/24"
+
+# Private SUBNET
+  SubnetRegionPrivate1:
+    Description: "Subnet Private Region 1"
+    Type: String
+    Default: "us-east-1a" 
+
+  CidrBlockPrivate1:
+    Description: "Cidr Block 1"
+    Type: String
+    Default: "10.0.4.0/24"
+
+  SubnetRegionPrivate2:
+    Description: "Subnet Private Region 2"
+    Type: String
+    Default: "us-east-1b" 
+
+  CidrBlockPrivate2:
+    Description: "Cidr Block 2"
+    Type: String
+    Default: "10.0.5.0/24"
+
+  SubnetRegionPrivate3:
+    Description: "Subnet Private Region 3"
+    Type: String
+    Default: "us-east-1c" 
+
+  CidrBlockPrivate3:
+    Description: "Cidr Block 1"
+    Type: String
+    Default: "10.0.6.0/24"
+
+  AMIID:
+    Description: "Select AMI ID"
+    Type: String
+    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+
+  KeyName:
+    Description: "Name of an existing EC2 KeyPair to enable SSH access to the instance"
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: must be the name of an existing EC2 KeyPair
+
+  HostedZoneResource:
+    Description: "DNS HOST NAME"
+    Type: String
+
+    Default: prod.meghanshubhatt.me.
+
+
+  # S3BucketName:
+  #   Description: "Name of the Bucket"
+  #   Type: String
+  #   Default: "meghanshu-test"
+
+
+  Accesskey:
+    Description: "Enter AWS Access key"
+    Type: String
+    Default: ""
+
+  SecretAccessKey:
+    Description: "Enter AWS Secret Access key"
+    Type: String
+    Default: ""
+
+
+# Mappings: 
+#   RegionMap: 
+#     us-east-1: 
+#       "AMI": "ami-0516ab904f1f55f5c"
+
+Resources:
+  myVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidrBlock
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      InstanceTenancy: 'default'
+      Tags:
+      - Key: Name
+        Value: !Ref AWS::StackName
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Ref AWS::StackName
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref myVPC
+
+# PUBLIC SUBNET
+
+  mySubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: myVPC
+      CidrBlock: !Ref CidrBlock1
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Ref SubnetRegion1  #"us-east-1a"
+      Tags:
+      - Key: Name
+        Value: !Sub ${AWS::StackName} Public Subnet 1
+
+  mySubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: myVPC
+      CidrBlock: !Ref CidrBlock2
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Ref SubnetRegion2  #"us-east-1b"
+      Tags:
+      - Key: Name
+        Value: !Sub ${AWS::StackName} Public Subnet 2
+
+  mySubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: myVPC
+      CidrBlock: !Ref CidrBlock3
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Ref SubnetRegion3  #"us-east-1c"
+      Tags:
+      - Key: Name
+        Value: !Sub ${AWS::StackName} Public Subnet 3
+
+# PRIVATE SUBNET
+
+  mySubnetPrivate1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: myVPC
+      CidrBlock: !Ref CidrBlockPrivate1
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Ref SubnetRegionPrivate1  #"us-east-1a"
+      Tags:
+      - Key: Name
+        Value: !Sub ${AWS::StackName} Private Subnet 1
+
+  mySubnetPrivate2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: myVPC
+      CidrBlock: !Ref CidrBlockPrivate2
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Ref SubnetRegionPrivate2  #"us-east-1a"
+      Tags:
+      - Key: Name
+        Value: !Sub ${AWS::StackName} Private Subnet 2
+
+  mySubnetPrivate3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: myVPC
+      CidrBlock: !Ref CidrBlockPrivate3
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Ref SubnetRegionPrivate3  #"us-east-1a"
+      Tags:
+      - Key: Name
+        Value: !Sub ${AWS::StackName} Private Subnet 3
+
+## PUBLIC ROUTE TABLE
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref myVPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName} Public Routes
+
+## PRIVATE ROUTE TABLE
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref myVPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName} Public Routes
+
+## PUBLIC ROUTE
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+## PRIVATE ROUTE
+  # DefaultPrivateRoute:
+  #   Type: AWS::EC2::Route
+  #   DependsOn: InternetGatewayAttachment
+  #   Properties:
+  #     RouteTableId: !Ref PrivateRouteTable
+  #     DestinationCidrBlock: 0.0.0.0/0
+  #     GatewayId: !Ref InternetGateway
+
+
+# PUBLIC ATTACHMENTS
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref mySubnet1
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref mySubnet2
+
+  PublicSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref mySubnet3
+
+# PRIVATE ATTACHMENTS
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref mySubnetPrivate1
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref mySubnetPrivate2
+
+  PrivateSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref mySubnetPrivate3
+
+
+
+## Load Balancing SG
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: csye6225-LoadBalancerSecuritygroup
+      GroupDescription: Security Group for web server load balancer
+      VpcId:
+        Ref: myVPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '443'
+        ToPort: '443'
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: '80'
+        ToPort: '80'
+        CidrIp: 0.0.0.0/0
+
+
+## INSTANCE SECURITY GROUP
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: 
+        Ref: myVPC
+      GroupDescription: Allow http to client host
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          SourceSecurityGroupId:
+            Fn::GetAtt:
+            - LoadBalancerSecurityGroup
+            - GroupId
+
+## DB SECURITY GROUP and RDS INSTANCE
+
+  DBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: csye6225-DBSecurityGroup
+      GroupDescription: Enable TCP access via port 3306
+      VpcId:
+        Ref: myVPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '3306'
+        ToPort: '3306'
+        SourceSecurityGroupId:
+          Fn::GetAtt:
+          - InstanceSecurityGroup
+          - GroupId
+
+  rdsdbSubnetGroupId:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: 'Data Base Group Name to be assigned to '
+      DBSubnetGroupName: DBsubnetGroup
+      SubnetIds:
+        - !Ref mySubnetPrivate1
+        - !Ref mySubnetPrivate2
+
+  #Always create a custom parameter group for DB
+  MYSqlDBParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Description: SQL custom param group
+      Family: mysql8.0
+  #RDS instance
+
+  RDSDBinstance: 
+    Type: AWS::RDS::DBInstance
+    DependsOn:
+      - rdsdbSubnetGroupId
+      - KmsRdsKey
+      - DBSecurityGroup
+    Properties: 
+      AllocatedStorage: "20"
+      DBInstanceClass: "db.t3.micro"
+      Engine: "MySQL"
+      EngineVersion: 8.0.30
+      MultiAZ: false
+      DBInstanceIdentifier: csye6225
+      MasterUsername: csye6225DB
+      MasterUserPassword: csye6225DB
+      DBSubnetGroupName:
+        Ref: rdsdbSubnetGroupId
+      VPCSecurityGroups:
+      - Ref: DBSecurityGroup
+      DBParameterGroupName: !Ref MYSqlDBParameterGroup
+      PubliclyAccessible: false
+      DBName: csye6225
+      StorageEncrypted: true
+      KmsKeyId: !Ref KmsRdsKey
+    DeletionPolicy: Delete
+
+  KmsRdsKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: Encryption Key for RDS
+      KeyPolicy:
+        Version: "2012-10-17"
+        Id: key-default-rds
+        Statement:
+          - Sid: Encryption for RDS
+            Effect: Allow
+            Principal:
+              AWS: !Join 
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref 'AWS::AccountId'
+                  - ':root'
+            Action: 'kms:*'
+            Resource: '*'
+
+  # Volume:
+  #   Type: AWS::EC2::Volume
+  #   Properties: 
+  #     Size: 50
+  #     VolumeType: GP2
+  #     AvailabilityZone: !GetAtt Ec2Instance.AvailabilityZone
+
+  RecordServiceS3Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Properties:
+      BucketName: !Join ["-", ['s3bucket', meghanshubhatt] ] #!Join ["-", [!Join ["-", ["meghanshu-buckets3-csye6225", !Select [4, !Split ["-", !Select [2, !Split ["/", !Ref AWS::StackId]]]]]], !Ref AWS::Region]]
+      
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: ChangingStorageClassFromStandardToStandardIA
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 30
+                StorageClass: STANDARD_IA
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Sub: "${AWS::StackName}-S3-Bucket"
+
+
+  EC2CSYE6225Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      RoleName: EC2-CSYE6225
+      Policies:
+        - PolicyName: WebAppS3
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                 - s3:GetObject
+                 - s3:PutObject
+                 - s3:DeleteObject
+                 - s3:DeleteBucket
+                 - s3:ListBucket
+                Resource:
+                  - !Join ["", ["arn:aws:s3:::", !Ref RecordServiceS3Bucket]]
+                  - !Join ["", ["arn:aws:s3:::", !Ref RecordServiceS3Bucket, "/*"]]          
+        - PolicyName: CloudWatchLog
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - 'ec2:DescribeTags'
+                  - 'cloudwatch:PutMetricData'
+                  - 'logs:PutLogEvents'
+                  - 'logs:DescribeLogStreams'
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:DescribeVolumes'
+                  - 'logs:DescribeLogGroups'
+                Resource: "*"
+              - Effect: Allow
+                Action: 
+                  - 'ssm:PutParameter'
+                  - 'ssm:GetParameter'
+                Resource: "arn:aws:ssm:::parameter/AmazonCloudWatch-*"
+
+        # - PolicyName: SNSTopic
+        #   PolicyDocument:
+        #     Version: '2012-10-17'
+        #     Statement:
+        #       - Effect: Allow 
+        #         Action: 
+        #           - SNS:Subscribe
+        #           - SNS:Publish
+        #           - sns:CreateTopic
+        #         Resource: "*" 
+
+
+        - PolicyName: DynamoDbEC2
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement: 
+              - Effect: Allow
+                Action: 
+                  - 'dynamodb:BatchGetItem'
+                  - 'dynamodb:GetItem'
+                  - 'dynamodb:Query'
+                  - 'dynamodb:BatchWriteItem'
+                  - 'dynamodb:PutItem'
+                  - 'dynamodb:UpdateItem'
+                Resource: !Join [ "", [ "arn:aws:dynamodb:", !Ref AWS::Region , ":", !Ref AWS::AccountId, ":table/csye6225" ] ]
+
+
+  RootInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: instance-ec2-profile
+      Path: /
+      Roles:
+        - !Ref "EC2CSYE6225Role"
+
+  DynamoDBId:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: csye6225
+      AttributeDefinitions:
+        - AttributeName: "emailId"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "emailId"
+          KeyType: "HASH"
+      ProvisionedThroughput:
+        ReadCapacityUnits: "1"
+        WriteCapacityUnits: "1"
+      TimeToLiveSpecification:
+        AttributeName: "ExpirationTime"
+        Enabled: true
+
+
+
+Outputs:
+    VpcId:
+      Description: The VPC ID
+      Value: !Ref myVPC
+      Export: 
+        Name: !Sub "VpcId"
+    SubnetId:
+      Description: List of public subnets
+      Value: !Join [ ",", [ !Ref mySubnet1, !Ref mySubnet2, !Ref mySubnet3 ]]
+    dynamoDBTable:
+      Description: "DynamoDB Table Name"
+      Value: !Ref DynamoDBId
+      Export: 
+        Name: !Sub "${AWS::StackName}-dynamoDBTable"
+    dynamoDBArn:
+      Description: "DynamoDB Table Arn"
+      Value: !GetAtt DynamoDBId.Arn
+      Export: 
+        Name: !Sub "${AWS::StackName}-dynamoDBArn"
+    EC2CSYE6225Role:
+      Description: EC2 Execution Role logical Id
+      Value: !Ref EC2CSYE6225Role
+      Export: 
+        Name: !Sub "EC2CSYE6225Role"
+    InstanceSecurityGroup:
+      Description: Exporting Security Group 
+      Value: !Ref InstanceSecurityGroup
+      Export: 
+        Name: !Sub "InstanceSecurityGroup"
+    SubnetRegion1: 
+      Description: Subnet Region 1 
+      Value: !Ref SubnetRegion1
+      Export: 
+        Name: !Sub "SubnetRegion1"
+
+    SubnetRegion2: 
+      Description: Subnet Region 2
+      Value: !Ref SubnetRegion2
+      Export: 
+        Name: !Sub "SubnetRegion2"
+
+    SubnetRegion3: 
+      Description: Subnet Region 3
+      Value: !Ref SubnetRegion3
+      Export: 
+        Name: !Sub "SubnetRegion3"
+
+    mySubnet1: 
+      Description: Public Subnet 1
+      Value: !Ref mySubnet1
+      Export: 
+        Name: !Sub "mySubnet1"
+
+    mySubnet2: 
+      Description: Public Subnet 2
+      Value: !Ref mySubnet2
+      Export: 
+        Name: !Sub "mySubnet2"
+
+    mySubnet3: 
+      Description: Public Subnet 3
+      Value: !Ref mySubnet3
+      Export: 
+        Name: !Sub "mySubnet3"
+
+    mySubnetPrivate1: 
+      Description: Private Subnet 1
+      Value: !Ref mySubnetPrivate1
+      Export: 
+        Name: !Sub "mySubnetPrivate1"
+
+    mySubnetPrivate2: 
+      Description: Private Subnet 2
+      Value: !Ref mySubnetPrivate2
+      Export: 
+        Name: !Sub "mySubnetPrivate2"
+
+    mySubnetPrivate3: 
+      Description: Private Subnet 3
+      Value: !Ref mySubnetPrivate3
+      Export: 
+        Name: !Sub "mySubnetPrivate3"
+
+
+    RecordServiceS3Bucket:
+      Description: Exporting S3 Bucket
+      Value: !Ref RecordServiceS3Bucket
+      Export: 
+        Name: !Sub "RecordServiceS3Bucket"
+
+    RDSDBinstance:
+      Description: Exporting RDSDB instance 
+      Value: !Ref RDSDBinstance
+      Export: 
+        Name: !Sub "RDSDBinstance"
+      
+    RDSDBEndpointAddress:
+      Description: Exporting RDSDB Endpoint Address 
+      Value: !GetAtt RDSDBinstance.Endpoint.Address
+      Export: 
+        Name: !Sub "RDSDBEndpointAddress"
+
+    LoadBalancerSecurityGroup:
+      Description: Exporting Security Group Id 
+      Value: !Ref LoadBalancerSecurityGroup
+      Export: 
+        Name: !Sub "LoadBalancerSecurityGroup"
+
+    RootInstanceProfile:
+      Description: Exporting Instance Profile
+      Value: !Ref RootInstanceProfile
+      Export: 
+        Name: !Sub "RootInstanceProfile"
+
+
+
+
+
+
+
+# aws cloudformation create-stack --stack-name example --template-body file://example.yml 
+#--parameters ParameterKey=UserData,ParameterValue=$(base64 -w0 setup-lnxcfg-user)
+
+# aws --region us-east-1 cloudformation create-stack --stack-name myvpc --template-body file://csye6225-infra.yml --parameters ParameterKey=UserData,ParameterValue=$(base64 -w0 startup)
+     
