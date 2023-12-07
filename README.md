@@ -2,6 +2,8 @@
 
 ## Overview
 
+![Project](arch.png)
+
 This repository encompasses a multi-tiered web application built with Spring Boot, designed to demonstrate a cloud-native architecture using various AWS services. The project features user management with email verification, document storage and management, and infrastructure provisioning with CloudFormation. Additionally, serverless components via AWS Lambda are employed for automated email services.
 
 ## Features
